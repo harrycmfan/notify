@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans-2.5.xsd 
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context-2.5.xsd" >
+
+
+	<!-- 配置connectionFactory -->
+	<bean id="jmsFactory" class="org.apache.activemq.pool.PooledConnectionFactory"
+		destroy-method="stop">
+		<property name="connectionFactory">
+			<bean class="org.apache.activemq.ActiveMQConnectionFactory">
+				<property name="brokerURL">
+					<value>tcp://192.168.10.214:61616</value>
+				</property>
+			</bean>
+		</property>
+		<property name="maxConnections" value="10"></property>
+	</bean>
+
+	<!-- Spring JMS Template -->
+	<bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+		<property name="connectionFactory">
+			<ref local="jmsFactory" />
+		</property>
+		<!-- 区别它采用的模式为false是p2p为true是订阅 -->
+		<property name="pubSubDomain" value="false" />
+	</bean>
+	
+	<bean id="producerApplicationHolder" class="com.jxdd.ecp.notify.core.producer.ProducerApplicationHolder" />
+	
+	<!-- 我们定义的发送默认消息Producer -->
+	<bean id="producerObserver" class="com.jxdd.ecp.notify.core.producer.impl.ActiveMQProducerObserver">
+		<property name="jmsTemplate" ref="jmsTemplate" />
+	</bean>
+	
+	<!-- 发送消息切面 -->
+	<bean id="producerServiceAdvisor" class="com.jxdd.ecp.notify.core.producer.NotifyProducerServiceAdvisor">
+		<property name="producerObserver" ref="producerObserver" />
+	</bean>
+	
+	<!-- 接收消息的代理 -->
+	<bean id="consumerListenerProxy " class="com.jxdd.ecp.notify.core.consumer.proxy.ActiveMQConsumerProxy" >
+		<property name="connectionFactory" ref="jmsFactory" />
+	</bean>
+	
+	
+	<bean id="zookeeperRegisterService"
+		class="com.jxdd.ecp.notify.ext.register.ZookeeperRegisterService"
+		init-method="init" destroy-method="destroy">
+		<property name="hosts" value="192.168.10.229:2181"></property>
+	</bean>
+
+	<bean id="registerProxy"
+		class="com.jxdd.ecp.notify.core.register.DefaultNotifyMateDataRegisterProxy">
+		<property name="notifyMateDataRegisterService" ref="zookeeperRegisterService" />
+	</bean>
+	
+	<!-- notify builder -->
+	<bean id="notifyBeanBuilder" class="com.jxdd.ecp.notify.core.builder.DefultNotifyBeanBuilder">
+		<property name="consumerRegisterProxy" ref="consumerListenerProxy" />
+		<property name="notifyProducerAdvice" ref="producerServiceAdvisor" />
+		<property name="notifyMateDataRegisterProxy" ref="registerProxy" />
+	</bean>
+	
+	<!-- notify holder  -->
+	<bean id="notifyBeanHolder" class="com.jxdd.ecp.notify.core.NotifyApplicationContextHolder">
+		<property name="notifyBeanBuilder" ref="notifyBeanBuilder" />
+	</bean>
+	
+	
+
+	<!-- 发送消息的目的地（一个队列） -->
+<!-- 	<bean id="destination" class="org.apache.activemq.command.ActiveMQQueue"> -->
+ 		<!-- 设置消息队列的名字 --> 
+<!-- 		<constructor-arg index="0" value="subject" /> -->
+<!-- 	</bean> -->
+
+	<!-- 消息监听     -->
+<!-- 	<bean id="listenerContainer" -->
+<!-- 		class="org.springframework.jms.listener.DefaultMessageListenerContainer"> -->
+<!-- 		<property name="concurrentConsumers" value="10" /> -->
+<!-- 		<property name="connectionFactory" ref="jmsFactory" /> -->
+<!-- 		<property name="destinationName" value="subject" /> -->
+<!-- 		<property name="messageListener" ref="messageReceiver" /> -->
+<!-- 		<property name="pubSubNoLocal" value="false"></property> -->
+<!-- 	</bean> -->
+
+<!-- 	<bean id="messageReceiver" class="com.jxdd.ecp.notify.core.consumer.impl.ActiveMQConsumer"> -->
+<!-- 		<property name="jmsTemplate" ref="jmsTemplate"></property> -->
+<!-- 	</bean> -->
+	
+	
+</beans>
